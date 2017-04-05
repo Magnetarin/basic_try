@@ -6,9 +6,7 @@ import com.dkriesel.snipe.core.NeuralNetworkDescriptor;
 import com.dkriesel.snipe.training.ErrorMeasurement;
 import com.dkriesel.snipe.training.TrainingSampleLesson;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -25,7 +23,7 @@ public class NumErkennung2 {
     double[][] output_test;
 
     public static void main(String[] args){
-        int anzHidden = 15;
+        int anzHidden = 30;
         System.out.println("anzHidden: "+anzHidden);
         Utils u = new Utils();
         NumErkennung2 nE = new NumErkennung2();
@@ -126,6 +124,41 @@ public class NumErkennung2 {
         //784
         //Root Mean Square Error after phase 6:	6.401274264700508
         //Root Mean Square Error Test Pictures:	7.076500298868502
+
+        String s = "";
+
+        do{
+            BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+            System.out.println("Enter String");
+            DecimalFormat decimalFormat = new DecimalFormat("##.##");
+            try {
+                s = br.readLine();
+                if(s.matches("[0-9]*")) {
+                    int num = Integer.parseInt(s);
+                    double[] output = net.propagate(lesson.getInputs()[num]);
+                    for(int i = 0; i<lesson.getInputs()[num].length;i++){
+                        System.out.print("\t["+decimalFormat.format(lesson.getInputs()[num][i])+"] ");
+                        if(i%28 == 0){
+                            System.out.println("");
+                        }
+                    }
+                    System.out.println("Output: " + output);
+//                    System.out.println("Winner ID: " + winnerID);
+//                    System.out.println("Is ok? "+(output == winnerID));
+//                    if(!(output == winnerID)){
+//                        if(!(output == 1 && (winnerID==som.neurons.length-1||winnerID==som.neurons.length-2))) {
+//                            System.out.println(som.printInput(som.changeArray(som.trainInput[num])));
+////                            System.out.println("linenum: " + som.lineNumber[num]);
+//                            System.out.println(som.getMax(som.changeArray(som.trainInput[num])).printZentrum());
+//                        }
+//                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+        }while(!s.equalsIgnoreCase("end"));
+
     }
 
     public void train(NeuralNetwork net){
@@ -133,7 +166,13 @@ public class NumErkennung2 {
         TrainingSampleLesson lesson = new TrainingSampleLesson(input_train,output_train);
         System.out.println("Root Mean Square Error before training:\t"
                 + ErrorMeasurement.getErrorRootMeanSquareSum(net, lesson));
-        net.trainResilientBackpropagation(lesson,    10000, false);
+        net.trainResilientBackpropagation(lesson, 200, false);
+//        for(int i=0; i< 60 ; i++) {
+//            net.trainResilientBackpropagation(lesson, 1000, false);
+//            System.out.println(i+". duchlauf => "+i*1000);
+//            System.out.println("Root Mean Square Error after training:\t"
+//                    + ErrorMeasurement.getErrorRootMeanSquareSum(net, lesson));
+//        }
         //net.trainResilientBackpropagation(lesson, 600000, false);
         System.out.println("Root Mean Square Error after training:\t"
                 + ErrorMeasurement.getErrorRootMeanSquareSum(net, lesson));
@@ -288,8 +327,8 @@ public class NumErkennung2 {
         for (int i = 0; i < output.length ; i++) {
             double[] in = lesson.getInputs()[i];
             double[] out = net.propagate(lesson.getInputs()[i]);
-            int outInt = numberTheOutputRepresents(out);
-            int shouldBe = numberTheOutputRepresents(output[i]);
+            int outInt = (int)numberTheOutputRepresents(out);
+            int shouldBe = (int)numberTheOutputRepresents(output[i]);
             if(shouldBe==outInt){
                 if(erg[outInt]==0){
                     erg[outInt]=1;
@@ -322,13 +361,15 @@ public class NumErkennung2 {
         return erg;
     }
 
-    private int numberTheOutputRepresents(double[] output){
-        int max = 0;
+    private double numberTheOutputRepresents(double[] output){
+        double max = -1;
+        double maxPos = 0;
         for(int i = 0; i<output.length;i++){
             if(output[i]>max){
-                max=i;
+                max=output[i];
+                maxPos=i;
             }
         }
-        return max;
+        return maxPos;
     }
 }
