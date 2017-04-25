@@ -10,44 +10,52 @@ import java.io.*;
 import java.nio.ByteBuffer;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.language.DoubleMetaphone;
+import org.openjdk.jmh.generators.core.SourceThrowableError;
 
 /**
  * Created by Maxima on 01.03.2017.
  */
 public class NumErkennung2 {
-    double[][] input_train;
-    double[][] output_train;
-    double[][] input_test;
-    double[][] output_test;
+    public double[][] input_train;
+    public double[][] output_train;
+    public double[][] input_test;
+    public double[][] output_test;
 
     public static void main(String[] args){
-        int anzHidden = 30;
+        int anzHidden = 15;
+        int num_Train = 60;
         System.out.println("anzHidden: "+anzHidden);
         Utils u = new Utils();
         NumErkennung2 nE = new NumErkennung2();
         NeuralNetwork net = new NeuralNetwork(nE.defineNetwork((28*28),anzHidden,10));
-        ArrayList<double[][]> al = u.getSample("C:\\Users\\Maxima\\FH\\bac\\basic_try\\src\\main\\resources\\train-images-idx3-ubyte",
-                "C:\\Users\\Maxima\\FH\\bac\\basic_try\\src\\main\\resources\\train-labels-idx1-ubyte",
+        ArrayList<double[][]> al = u.getSample("src\\main\\resources\\train-images-idx3-ubyte",
+                "src\\main\\resources\\train-labels-idx1-ubyte",
                 nE.input_train,
                 nE.output_train);
         nE.input_train = al.get(0);
         nE.output_train = al.get(1);
         al.clear();
-        al = u.getSample("C:\\Users\\Maxima\\FH\\bac\\basic_try\\src\\main\\resources\\t10k-images-idx3-ubyte",
-                "C:\\Users\\Maxima\\FH\\bac\\basic_try\\src\\main\\resources\\t10k-labels-idx1-ubyte",
+        al = u.getSample("src\\main\\resources\\t10k-images-idx3-ubyte",
+                "src\\main\\resources\\t10k-labels-idx1-ubyte",
                 nE.input_test,
                 nE.output_test);
         nE.input_test = al.get(0);
         nE.output_test = al.get(1);
 
-        TrainingSampleLesson lesson = new TrainingSampleLesson(nE.input_test,nE.output_test);
+        TrainingSampleLesson lesson = new TrainingSampleLesson(nE.input_train,nE.output_train);
         System.out.println("Root Mean Square Error Test Pictures:\t"
                 + ErrorMeasurement.getErrorRootMeanSquareSum(net, lesson));
         //nE.checkCorrect(lesson,net, nE.output_test);
         long startTime = System.currentTimeMillis();
-        nE.train(net);
+//        nE.train(net);
+        nE.train(net,num_Train);
+        nE.checkCorrect(lesson,net,nE.output_train);
         long endTime = System.currentTimeMillis();
         //nE.trainVariable(net);
 
@@ -55,12 +63,10 @@ public class NumErkennung2 {
         //nE.printErgWithInput(lesson,net,1);
        // nE.checkCorrect(lesson,net,nE.output_test);
         System.out.println("######################################");
-        TrainingSampleLesson lesson1 = new TrainingSampleLesson(nE.input_train,nE.output_train);
+        TrainingSampleLesson lesson1 = new TrainingSampleLesson(nE.input_test,nE.output_test);
        // nE.checkCorrect(lesson1,net,nE.output_train);
 
         System.out.println("Time: "+endTime+" - "+startTime+" = "+(endTime-startTime));
-
-
 
         System.out.println("countLayer: "+net.countLayers());
         System.out.println("countNeurons: "+net.countNeurons());
@@ -119,11 +125,56 @@ public class NumErkennung2 {
         System.out.println("anz: "+anz2);
         System.out.println("diff: "+(net2.countSynapses()-anz2)+"\n");
 
-        nE.checkCorrect(lesson1,net,nE.output_train);
+        nE.checkCorrect(lesson,net,nE.output_train);
 
+        nE.checkCorrect(lesson1,net,nE.output_test);
+        
+        nE.printTime(endTime-startTime);
+        
         //784
         //Root Mean Square Error after phase 6:	6.401274264700508
         //Root Mean Square Error Test Pictures:	7.076500298868502
+
+
+        int trueInt = -1;
+        int falseInt = -1;
+        for(int i = 0; i<nE.input_train.length; i++){
+            int erg = (int)nE.numberTheOutputRepresents(net.propagate(nE.input_train[i]));
+            int shouldBe = (int)nE.numberTheOutputRepresents(nE.output_train[i]);
+            if(erg == shouldBe){
+                trueInt = i;
+            } else if(erg != shouldBe){
+                falseInt = i;
+            }
+            if(trueInt > -1 && falseInt > 0){
+                break;
+            }
+        }
+
+        double[] perfInput = nE.input_train[trueInt];
+        long[][] statistic = new long[6][3];
+
+        System.out.println("True Number");
+        System.out.println("\tFirst");
+        nE.getTimeStatistic(net,nE.input_train[trueInt]);
+        System.out.println("False Number");
+        System.out.println("\tFirst");
+        nE.getTimeStatistic(net,nE.input_train[falseInt]);
+        System.out.println("True Number");
+        System.out.println("\tSecound");
+        nE.getTimeStatistic(net,nE.input_train[trueInt]);
+        System.out.println("False Number");
+        System.out.println("\tSecound");
+        nE.getTimeStatistic(net,nE.input_train[falseInt]);
+        System.out.println("True Number");
+        System.out.println("\tThird");
+        nE.getTimeStatistic(net,nE.input_train[trueInt]);
+        System.out.println("False Number");
+        System.out.println("\tThird");
+        nE.getTimeStatistic(net,nE.input_train[falseInt]);
+
+        perfInput = nE.input_train[falseInt];
+
 
         String s = "";
 
@@ -134,24 +185,26 @@ public class NumErkennung2 {
             try {
                 s = br.readLine();
                 if(s.matches("[0-9]*")) {
-                    int num = Integer.parseInt(s);
-                    double[] output = net.propagate(lesson.getInputs()[num]);
-                    for(int i = 0; i<lesson.getInputs()[num].length;i++){
-                        System.out.print("\t["+decimalFormat.format(lesson.getInputs()[num][i])+"] ");
-                        if(i%28 == 0){
-                            System.out.println("");
-                        }
-                    }
-                    System.out.println("Output: " + output);
-//                    System.out.println("Winner ID: " + winnerID);
-//                    System.out.println("Is ok? "+(output == winnerID));
-//                    if(!(output == winnerID)){
-//                        if(!(output == 1 && (winnerID==som.neurons.length-1||winnerID==som.neurons.length-2))) {
-//                            System.out.println(som.printInput(som.changeArray(som.trainInput[num])));
-////                            System.out.println("linenum: " + som.lineNumber[num]);
-//                            System.out.println(som.getMax(som.changeArray(som.trainInput[num])).printZentrum());
-//                        }
-//                    }
+                    int tn = Integer.parseInt(s);
+                    System.out.println("######################################");
+                    System.out.println("Root Mean Square Error Test Pictures:\t"
+                            + ErrorMeasurement.getErrorRootMeanSquareSum(net, lesson));
+                    //nE.checkCorrect(lesson,net, nE.output_test);
+                    startTime = System.currentTimeMillis();
+//        nE.train(net);
+                    nE.train(net,tn);
+                    nE.checkCorrect(lesson,net,nE.output_train);
+                    endTime = System.currentTimeMillis();
+                    //nE.trainVariable(net);
+
+
+                    //nE.printErgWithInput(lesson,net,1);
+                    // nE.checkCorrect(lesson,net,nE.output_test);
+                    nE.checkCorrect(lesson,net,nE.output_train);
+
+                    nE.checkCorrect(lesson1,net,nE.output_test);
+                    nE.printTime(endTime-startTime);
+                    System.out.println("######################################");
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -161,12 +214,48 @@ public class NumErkennung2 {
 
     }
 
+    public long[] getTimeStatistic(NeuralNetwork net, double[] perfInput){
+        long[] statistics = new long[3];
+        long avg = 0;
+        long startTime = 0;
+        long endTime = 0;
+        ArrayList<Long> times = new ArrayList<>();
+        for(int i = 0; i<100; i++){
+            startTime = System.nanoTime();
+            net.propagate(perfInput);
+            endTime = System.nanoTime();
+            //System.out.println("Time: "+endTime+" - "+startTime+" = "+(endTime-startTime)+"ns");
+            times.add(endTime - startTime);
+            avg += (endTime-startTime);
+        }
+        statistics[0] = Collections.min(times);
+        statistics[1] = Collections.max(times);
+        statistics[2] = (avg/100);
+        System.out.println("\t\tMin: "+Collections.min(times));
+        System.out.println("\t\tMax: "+Collections.max(times));
+        System.out.println("\t\tAvg: "+(avg/100));
+        return statistics;
+    }
+    
+    public void printTime(long millis){
+    	System.out.println(String.format("%02d:%02d:%02d", 
+    			TimeUnit.MILLISECONDS.toHours(millis),
+    			TimeUnit.MILLISECONDS.toMinutes(millis) -  
+    			TimeUnit.HOURS.toMinutes(TimeUnit.MILLISECONDS.toHours(millis)), // The change is in this line
+    			TimeUnit.MILLISECONDS.toSeconds(millis) - 
+    			TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(millis))));   
+    }
+
     public void train(NeuralNetwork net){
+    	train(net,60000);
+    }
+    public void train(NeuralNetwork net,int num){
         double trainingsrate = 0.00005;
         TrainingSampleLesson lesson = new TrainingSampleLesson(input_train,output_train);
         System.out.println("Root Mean Square Error before training:\t"
                 + ErrorMeasurement.getErrorRootMeanSquareSum(net, lesson));
-        net.trainResilientBackpropagation(lesson, 200, false);
+        net.trainResilientBackpropagation(lesson, num, false);
+        System.out.println(num+" Wiederholungen");
 //        for(int i=0; i< 60 ; i++) {
 //            net.trainResilientBackpropagation(lesson, 1000, false);
 //            System.out.println(i+". duchlauf => "+i*1000);
